@@ -126,6 +126,8 @@ class CellList
         int             oppo_base_index;
         int             ally_ants;
         int             oppo_ants;
+		int				init_cystals;
+		int				init_eggs;
     
     public:
         void            add_cell(Cell new_cell);
@@ -323,6 +325,10 @@ void    CellList::add_cell(Cell new_cell)
     this->cells.push_back(new_cell);
     if (new_cell.type == EGG || new_cell.type == CRYSTAL)
         this->ressource_cells.push_back(new_cell);
+	if (new_cell.type == EGG)
+		this->init_eggs += new_cell.current_resource;
+	if (new_cell.type == CRYSTAL)
+		this->init_cystals += new_cell.current_resource;
 }
 
 void    CellList::print_cells()
@@ -356,20 +362,6 @@ int		nearest_cell_in_vector(Cell base, vector<Cell> cell_vec)
 	return (cellList.ally_base_indexes[0]);
 }
 
-int	count_target(vector<vector<Cell>>	cells_to_link)
-{
-	int count = 0;
-
-	for (int i = 0; i < cells_to_link.size(); i++)
-	{
-		for (int j = 0; j < cells_to_link[i].size(); j++)
-		{
-			count++;
-		}
-	}
-	return (count);
-}
-
 // DEFINE RANGE TO SEARCH FOR PRIORITY CELLS
 int						max_range = 5;
 vector<vector<Cell>>	generate_priority_cells()
@@ -381,15 +373,13 @@ vector<vector<Cell>>	generate_priority_cells()
 		vector<Cell>	cells_for_base;
 		Cell			curr_base = cellList.cells[cellList.ally_base_indexes[i]];
 
-		cells_for_base.push_back(curr_base);
-		for (int cell = 0; cell < cellList.cells.size(); cell++)
+		for (int dist = 1; dist < max_range && dist < curr_base.cells_from_cell.size(); dist++)
 		{
-			Cell		looking_cell = cellList.cells[cell];
-			if (curr_base.get_dist_index(looking_cell.self_index) < max_range
-			&& looking_cell.type != 0
-			&& looking_cell.current_resource > 0)
+			for (int i = 0; i < curr_base.cells_from_cell[dist].size(); i++)
 			{
-				cells_for_base.push_back(looking_cell);
+				Cell cell = cellList.get_cell(curr_base.cells_from_cell[dist][i]);
+				if (cell.current_resource > 0)
+					cells_for_base.push_back(cell);
 			}
 		}
 		if (cells_for_base.size() < 5)
@@ -400,11 +390,33 @@ vector<vector<Cell>>	generate_priority_cells()
 	return (cells_to_link);
 }
 
+int 	best_start_link(vector<int> &linked_cell_indexes, Cell target)
+{
+	int nearest_cell = target.self_index;
+	int min = 10000;
+	for (int i = 0; i < linked_cell_indexes.size(); i++)
+	{
+		int dist = target.get_dist_index(linked_cell_indexes[i]);
+		if (dist < min)
+		{
+			nearest_cell = linked_cell_indexes[i];
+			min = dist;
+		}
+	}
+	// cerr << "LINKING " << target.self_index << " TO " << nearest_cell << endl;  
+	return (nearest_cell);
+}
+
 void	path_resource_to_resouce()
 {
 	// INIT INITIAL LIST OF RESSOURCE CELLS + ALLY BASES
 	vector<int>				best_path;
 	vector<vector<Cell>>	cells_to_link = generate_priority_cells();
+
+	// ADD BASES AS STARTING POINT FOR LINKING
+	vector<int>		linked_cell_indexes;
+	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
+		linked_cell_indexes.push_back(cellList.ally_base_indexes[i]);
 
 	// BEACON ONE OR MANY MAPS DEPENDING ON CELLS TO LINK
 	for (int base = 0; base < cells_to_link.size(); base++)
@@ -413,10 +425,11 @@ void	path_resource_to_resouce()
 		vector<int> 	full_path;
 		
 		// DEFINE PATH
-		for (vector<Cell>::iterator it = cells_to_link_base_i.begin(); it != cells_to_link_base_i.end() - 1;)
+		for (vector<Cell>::iterator it = cells_to_link_base_i.begin(); it != cells_to_link_base_i.end();)
 		{
-			int nearest_index = nearest_cell_in_vector(*it, cells_to_link_base_i);
-			vector<int> path = cellList.path_index_to_index((*it).self_index, nearest_index);
+			int best_start = best_start_link(linked_cell_indexes, *it);
+			linked_cell_indexes.push_back((*it).self_index);
+			vector<int> path = cellList.path_index_to_index((*it).self_index, best_start);
 			full_path.insert(full_path.end(), path.begin(), path.end());
 			cells_to_link_base_i.erase(it);
 		}
