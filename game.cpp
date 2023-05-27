@@ -25,14 +25,16 @@ void	BEACON(int index, int strength)
 class Cell
 {
     public:
+        vector<vector<int>> cells_from_cell;
+        vector<int>         neigh_index;
+
         int                 type;
         int                 initial_resource;
         int                 current_resource;
-        int                 self_index;
-        vector<int>         neigh_index;
         int                 ally_ants;
         int                 oppo_ants;
-        vector<vector<int>> cells_from_cell;
+
+        int                 self_index;
 		int					beaconed;
 		bool				ally_base;
 		bool				oppo_base;
@@ -41,7 +43,7 @@ class Cell
         Cell(int _type, int _initial_resource, int self_index, int _neigh_0, int _neigh_1, int _neigh_2, int _neigh_3, int _neigh_4, int _neigh_5);
 
         void    update_cell(int _ressources, int _ally_ants, int _oppo_ants);
-        void    set_distance();
+		int		get_dist_index(int index);
         void    print_cell(string msg);
 
 };
@@ -63,6 +65,19 @@ Cell::Cell(int _type, int _initial_resource, int _self_index, int _neigh_0, int 
 	this->ally_base = false;
 	this->oppo_base = false;
 	this->beaconed = 0;
+}
+
+int		Cell::get_dist_index(int index)
+{
+	for (int dist = 0; dist < this->cells_from_cell.size(); dist++)
+	{
+		for (int i = 0; i < this->cells_from_cell[dist].size(); i++)
+		{
+			if (this->cells_from_cell[dist][i] == index)
+				return (dist);
+		}
+	}
+	return (-1);
 }
 
 void    Cell::update_cell(int _ressources, int _ally_ants, int _oppo_ants)
@@ -124,6 +139,8 @@ class CellList
 		Cell			&get_cell(int index);
 
 		bool			is_neighboor(int index1, int index2);
+		int				most_popular_neigh(vector<int> neigh_list);
+		int				best_neighboor(vector<int> parent_cells, Cell child_cell);
 
 		vector<int>		path_index_to_index(int index1, int index2);
 };
@@ -196,6 +213,7 @@ Cell	&CellList::get_cell(int index)
 	return (this->cells[index]);
 }
 
+
 bool	CellList::is_neighboor(int index1, int index2)
 {
 	Cell cell_1 = this->cells[index1];
@@ -204,6 +222,69 @@ bool	CellList::is_neighboor(int index1, int index2)
 		if (cell_1.neigh_index[i] == index2)
 			return (true);
 	return (false);
+}
+
+int		neigh_count(vector<int> neigh_indexes)
+{
+	int count = 0;
+	for (int i = 0; i < neigh_indexes.size(); i++)
+	{
+		if (neigh_indexes[i])
+			count++;
+	}
+	return (count);
+}
+
+int		CellList::most_popular_neigh(vector<int> neigh_list)
+{
+	int max = 0;
+	int most_popular = neigh_list[0];
+
+	for (int i = 0; i < neigh_list.size(); i++)
+	{
+		int count = 0;
+		vector<int> curr_neigh = this->cells[neigh_list[i]].neigh_index;
+		for (int j = 0; j < curr_neigh.size(); j++)
+		{
+			if (curr_neigh[j])
+				count++;
+			if (this->cells[curr_neigh[j]].type)
+				count++;
+		}
+		if (count > max)
+		{
+			max = count;
+			most_popular = neigh_list[i];
+		}
+	}
+	return (most_popular);
+}
+
+int		CellList::best_neighboor(vector<int> parent_cells, Cell child_cell)
+{
+	vector<int>	interesting_neigh;
+	for (int i = 0; i < parent_cells.size(); i++)
+	{
+		if (is_neighboor(child_cell.self_index, parent_cells[i]) 
+		&& (this->cells[parent_cells[i]].beaconed 
+			|| this->cells[parent_cells[i]].current_resource > 0))
+			return (parent_cells[i]);
+			// interesting_neigh.push_back(parent_cells[i]);
+	}
+	// if (!interesting_neigh.empty())
+	// 	return (most_popular_neigh(interesting_neigh));
+
+	vector<int> normal_neigh;
+	for (int i = 0; i < parent_cells.size(); i++)
+	{
+		if (is_neighboor(child_cell.self_index, parent_cells[i]))
+			normal_neigh.push_back(parent_cells[i]);
+	}
+	if (!normal_neigh.empty())
+		return (most_popular_neigh(normal_neigh));
+
+	cerr << "BEST NEIGHBOOR NOT FOUND :(" << endl;
+	return (0);
 }
 
 vector<int>		CellList::path_index_to_index(int index1, int index2)
@@ -230,15 +311,9 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 	path.push_back(cell_2.self_index);
 	while (dist--)
 	{
-		for (int i = 0; i < cell_1.cells_from_cell[dist].size(); i++)
-		{
-			if (is_neighboor(cell_1.cells_from_cell[dist][i], point))
-			{
-				path.push_back(cell_1.cells_from_cell[dist][i]);
-				point = cell_1.cells_from_cell[dist][i];
-				break;
-			}
-		}
+		int best_neigh = best_neighboor(cell_1.cells_from_cell[dist], this->cells[point]);
+		path.push_back(best_neigh);
+		point = best_neigh;
 	}
 	return (path);
 }
@@ -292,45 +367,35 @@ int	count_target(vector<vector<Cell>>	cells_to_link)
 			count++;
 		}
 	}
-	cerr << "COUNT " << count << endl;
 	return (count);
 }
 
+// DEFINE RANGE TO SEARCH FOR PRIORITY CELLS
+int						max_range = 5;
 vector<vector<Cell>>	generate_priority_cells()
 {
 	vector<vector<Cell>>	cells_to_link;
 
-	// FIND EGGS NEAR ALL BASES
-	int max_search = 4;
-	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
+	for (int i = 0; i <  cellList.ally_base_indexes.size(); i++)
 	{
-		vector<Cell>	map;
-		Cell ally_cell = cellList.cells[cellList.ally_base_indexes[i]];
-		map.push_back(ally_cell);
+		vector<Cell>	cells_for_base;
+		Cell			curr_base = cellList.cells[cellList.ally_base_indexes[i]];
 
-		for (int dist = 1; dist < max_search && dist < ally_cell.cells_from_cell.size(); dist++)
+		cells_for_base.push_back(curr_base);
+		for (int cell = 0; cell < cellList.cells.size(); cell++)
 		{
-			for (int j = 0; j < ally_cell.cells_from_cell[dist].size(); j++)
+			Cell		looking_cell = cellList.cells[cell];
+			if (curr_base.get_dist_index(looking_cell.self_index) < max_range
+			&& looking_cell.type != 0
+			&& looking_cell.current_resource > 0)
 			{
-				if (cellList.cells[ally_cell.cells_from_cell[dist][j]].type == EGG 
-				&& cellList.cells[ally_cell.cells_from_cell[dist][j]].current_resource > 0)
-					map.push_back(cellList.cells[ally_cell.cells_from_cell[dist][j]]);
+				cells_for_base.push_back(looking_cell);
 			}
 		}
-		cells_to_link.push_back(map);
+		if (cells_for_base.size() < 5)
+			max_range += 2;
+		cells_to_link.push_back(cells_for_base);
 	}
-	if (count_target(cells_to_link) >= 3)
-		return (cells_to_link);
-	else
-		cells_to_link.clear();
-
-	vector<Cell>	map;
-	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
-		map.push_back(cellList.cells[cellList.ally_base_indexes[i]]);
-	for (int i = 0; i < cellList.cells.size(); i++)
-		if (cellList.cells[i].type != 0 && cellList.cells[i].current_resource > 0)
-			map.push_back(cellList.cells[i]);
-	cells_to_link.push_back(map);
 
 	return (cells_to_link);
 }
@@ -338,42 +403,38 @@ vector<vector<Cell>>	generate_priority_cells()
 void	path_resource_to_resouce()
 {
 	// INIT INITIAL LIST OF RESSOURCE CELLS + ALLY BASES
-	vector<int> 			best_path;
+	vector<int>				best_path;
 	vector<vector<Cell>>	cells_to_link = generate_priority_cells();
 
+	// BEACON ONE OR MANY MAPS DEPENDING ON CELLS TO LINK
 	for (int base = 0; base < cells_to_link.size(); base++)
 	{
-		// SHUFFLE PATH
-		for (int round = 0; round < 20; round++)
+		vector<Cell>	cells_to_link_base_i = cells_to_link[base];
+		vector<int> 	full_path;
+		
+		// DEFINE PATH
+		for (vector<Cell>::iterator it = cells_to_link_base_i.begin(); it != cells_to_link_base_i.end() - 1;)
 		{
-			vector<Cell>	cells_to_link_shuffle = cells_to_link[base];
-			std::random_shuffle(cells_to_link_shuffle.begin(), cells_to_link_shuffle.end());
-			vector<int> 			full_path;
-			
-			for (vector<Cell>::iterator it = cells_to_link_shuffle.begin(); it != cells_to_link_shuffle.end() - 1;)
-			{
-				int nearest_index = nearest_cell_in_vector(*it, cells_to_link_shuffle);
-				vector<int> path = cellList.path_index_to_index((*it).self_index, nearest_index);
-				full_path.insert(full_path.end(), path.begin(), path.end());
-				cells_to_link_shuffle.erase(it);
-			}
-			std::sort(full_path.begin(), full_path.end());
-			auto last = std::unique(full_path.begin(), full_path.end());
-			full_path.erase(last, full_path.end());
-			if (best_path.empty() || best_path.size() > full_path.size())
-				best_path = full_path;
+			int nearest_index = nearest_cell_in_vector(*it, cells_to_link_base_i);
+			vector<int> path = cellList.path_index_to_index((*it).self_index, nearest_index);
+			full_path.insert(full_path.end(), path.begin(), path.end());
+			cells_to_link_base_i.erase(it);
 		}
+
+		// CLEAN DOUBLE BEACON
+		std::sort(full_path.begin(), full_path.end());
+		auto last = std::unique(full_path.begin(), full_path.end());
+		full_path.erase(last, full_path.end());
 
 		// GO GO GO GO
-		for (int i = 0; i < best_path.size(); i++)
+		for (int i = 0; i < full_path.size(); i++)
 		{
 			int strength = 1;
-			if (cellList.cells[best_path[i]].oppo_base)
+			if (cellList.cells[full_path[i]].oppo_base)
 				strength = 3;
-			BEACON(best_path[i], strength);
+			BEACON(full_path[i], strength);
 		}
 	}
-
 }
 
 ///////// STRATEGY FUNCTION /////////
