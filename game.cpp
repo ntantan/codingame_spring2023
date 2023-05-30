@@ -418,12 +418,12 @@ void	set_cells_value()
 		}
 
 		// GET QUANTITY OF RESSOURCE COMPARED TO ALL AVAILABLE
-		int weight = ;
-		if (cells[i].type == EGG)
-			weight = cells[i].initial_resource * 100 / cellList.init_eggs;
-		else if (cells[i].type == CRYSTAL)
-			weight = cells[i].initial_resource * 100 / cellList.init_cystals;
-		cerr << "WEIGHT OF CELL " << cells[i].self_index << " IS " << weight << endl;
+		int weight = 1;
+		// if (cells[i].type == EGG)
+		// 	weight = cells[i].initial_resource * 100 / cellList.init_eggs;
+		// else if (cells[i].type == CRYSTAL)
+		// 	weight = cells[i].initial_resource * 100 / cellList.init_cystals;
+		// cerr << "WEIGHT OF CELL " << cells[i].self_index << " IS " << weight << endl;
 
 		// DISTANCE VALUES
 		int dist_value = 0;
@@ -442,14 +442,14 @@ void	set_cells_value()
 		else if (dist_min_ally == dist_min_oppo)
 			dist_value = 2 * cellList.map_size - dist_min_ally;
 		else
-			dist_value = cellList.map_size + dist_min_ally - dist_min_oppo;
+			dist_value = cellList.map_size - dist_min_ally;
 
 		// SET VALUE FOR THIS CELL
 		if (cells[i].type == EGG)
 			cells[i].value = egg_value * weight * dist_value;
 		else if (cells[i].type == CRYSTAL)
 			cells[i].value = crystal_value * weight * dist_value;
-		cerr << "VALUE" << cells[i].self_index << "=" << cells[i].value << " DIST=" << dist_value << " ALLY=" << dist_min_ally << " OPPO=" << dist_min_oppo << endl;
+		// cerr << "VALUE" << cells[i].self_index << "=" << cells[i].value << " DIST=" << dist_value << " ALLY=" << dist_min_ally << " OPPO=" << dist_min_oppo << endl;
 	}
 }
 
@@ -458,7 +458,7 @@ void	sort_cells_by_value(vector<Cell> &cells)
 	std::sort(cells.begin(), cells.end(), [](Cell a, Cell b) {return (a.value > b.value);});
 }
 
-bool	am_I_too_rich(vector<Cell>	&target_cells)
+bool	am_I_too_rich(vector<Cell>	&target_cells, Cell curr_cell)
 {
 	int		crystal_count = cellList.my_crystals;
 
@@ -467,10 +467,12 @@ bool	am_I_too_rich(vector<Cell>	&target_cells)
 		if (target_cells[i].type == CRYSTAL)
 			crystal_count += target_cells[i].current_resource;
 	}
+	// crystal_count += curr_cell.current_resource;
+	// cerr << "HAVE " << cellList.my_crystals  << " MAP " << cellList.init_cystals << " CRYST COUNT " << crystal_count << endl;
 
-	if (cellList.my_crystals % 2 == 1 && crystal_count >= (cellList.my_crystals + 1) / 2)
+	if (cellList.init_cystals % 2 == 1 && crystal_count >= (cellList.init_cystals + 1) / 2)
 		return (true);
-	if (cellList.my_crystals % 2 == 0 && crystal_count >= cellList.my_crystals / 2)
+	if (cellList.init_cystals % 2 == 0 && crystal_count >= cellList.init_cystals / 2)
 		return (true);
 	return (false);
 }
@@ -492,13 +494,13 @@ vector<vector<Cell>>	generate_priority_cells()
 	vector<Cell>	target_cell;
 	for (int i = 0; i < max_target && i < cells_for_base.size(); i++)
 	{
-		cerr << "TARGET " << cells_for_base[i].self_index << " VALUE " << cells_for_base[i].value << endl;
+		// cerr << "TARGET " << cells_for_base[i].self_index << " VALUE " << cells_for_base[i].value << endl;
 		target_cell.push_back(cells_for_base[i]);
-		// TO AVOID GOING TOO MUCH TOWARD LOW VALUE CELL
-		// if (am_I_too_rich(target_cell));
-		// 	break;
-		if (cells_for_base[i].value <= 0)
+		if (am_I_too_rich(target_cell, cells_for_base[i]) && target_cell.size() >= 1)
 			break;
+		// TO AVOID GOING TOO MUCH TOWARD LOW VALUE CELL
+		if (cells_for_base[i].value <= 0)
+			i++;
 	}
 	cells_to_link.push_back(target_cell);
 
@@ -527,7 +529,6 @@ void	go_little_ants()
 	// INIT INITIAL LIST OF RESSOURCE CELLS + ALLY BASES
 	vector<int>				best_path;
 	vector<vector<Cell>>	cells_to_link = generate_priority_cells();
-
 	// ADD BASES AS STARTING POINT FOR LINKING
 	vector<int>		linked_cell_indexes;
 	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
@@ -562,6 +563,8 @@ void	go_little_ants()
 			// 	strength = 3;
 			BEACON(full_path[i], strength);
 		}
+		if (full_path.empty())
+			cout << "WAIT;";
 	}
 }
 
@@ -609,7 +612,11 @@ int main()
     //// GAME LOOP  ////
     while (1) {
         //// MAP UPDATE ////
-
+		int my_score;
+        int opp_score;
+        cin >> my_score >> opp_score; cin.ignore();
+		cellList.my_crystals = my_score;
+		cellList.oppo_crystals = opp_score;
         cellList.set_ants(0, 0); // reset ants before recounting them
         for (int i = 0; i < number_of_cells; i++) {
             int resources; // the current amount of eggs/crystals on this cell
