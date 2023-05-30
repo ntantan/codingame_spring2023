@@ -135,7 +135,6 @@ class CellList
 		int				curr_crystal;
 		int				my_crystals;
 		int				oppo_crystals;
-		int				map_size;
     
     public:
         void            add_cell(Cell new_cell);
@@ -379,8 +378,8 @@ void	set_cells_value()
 	vector<Cell>	&cells = cellList.cells;
 	
 	// MAP SIZE REF
-	cellList.map_size = (cellList.cells.size() / 5) + 1;
-	// cerr << "MAP SIZE = " << cellList.map_size << endl;
+	int map_size = (cellList.cells.size() / 5) + 1;
+	// cerr << "MAP SIZE = " << map_size << endl;
 
 	int egg_value = 10;
 	int	crystal_value = 10;
@@ -424,15 +423,12 @@ void	set_cells_value()
 				dist_min_oppo = temp;
 		}
 
-		// NULLIFY VALUE IF TOO FAR FROM A BASE 
-		if (dist_min_ally > cellList.ally_ants)
-			dist_value = 0; 
-		else if (dist_min_ally > dist_min_oppo)
+		if (dist_min_ally > dist_min_oppo)
 			dist_value = 0 - dist_min_ally;
 		else if (dist_min_ally == dist_min_oppo)
-			dist_value = 2 * cellList.map_size - dist_min_ally;
+			dist_value = 2 * map_size - dist_min_ally;
 		else
-			dist_value = cellList.map_size + dist_min_ally - dist_min_oppo;
+			dist_value = map_size - dist_min_ally + dist_min_oppo;
 
 		// GET QUANTITY OF RESSOURCE COMPARED TO ALL AVAILABLE
 		int weight = 0;
@@ -447,7 +443,7 @@ void	set_cells_value()
 			cells[i].value = egg_value * dist_value;
 		else if (cells[i].type == CRYSTAL)
 			cells[i].value = crystal_value * dist_value;
-		// cerr << "VALUE" << cells[i].self_index << "=" << cells[i].value << " DIST=" << dist_value << " ALLY=" << dist_min_ally << " OPPO=" << dist_min_oppo << endl;
+		// cerr << "VALUE OF CELL " << cells[i].self_index << " IS " << cells[i].value << endl;
 	}
 }
 
@@ -560,8 +556,8 @@ void	go_little_ants()
 		for (int i = 0; i < full_path.size(); i++)
 		{
 			int strength = 1;
-			// if (cellList.cells[full_path[i]].oppo_base)
-			// 	strength = 3;
+			if (cellList.cells[full_path[i]].oppo_base)
+				strength = 3;
 			BEACON(full_path[i], strength);
 		}
 	}

@@ -28,3 +28,17 @@ What could determine the value of a cell ?
 - Distance from a base, more interesting if closer
 - Quantity of that ressource compared to the total on the map
 - How to determine if egg or crystal is priority ?
+- Max target = ants / 10 ?
+
+30/05
+- Distance from each base :
+	equal distance to both base = High priority as it medium to defend but higly impact the game
+	nearer from one of my base = Easy to defend
+	nearer from ennemy base = Hard to defend
+- Quantity of eggs : when half harvested, 
+
+
+Piste d'améliorations :
+- Calculer la combinaisons de cellules precises pour gagner
+- Avant de prendre une nouvelle target, checker si les cellules que l'on a est suffisant pour win 
+- Pathfinding sans indice -> Choisir la cellule qui est la plus proche d'une autre cellule
