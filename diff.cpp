@@ -135,6 +135,7 @@ class CellList
 		int				curr_crystal;
 		int				my_crystals;
 		int				oppo_crystals;
+		int				map_size;
     
     public:
         void            add_cell(Cell new_cell);
@@ -373,13 +374,25 @@ CellList    cellList;
 
 ///////// STRATEGY FUNCTION /////////
 
+int		get_nearest_in_indexes(Cell cell, vector<int> indexes)
+{
+	int min = 2147483647;
+	for (int i = 0; i < indexes.size(); i++)
+	{
+		int temp = cell.get_dist_index(indexes[i]);
+		if (temp < min)
+			min = temp;
+	}
+	return (min);
+}
+
 void	set_cells_value()
 {
 	vector<Cell>	&cells = cellList.cells;
 	
 	// MAP SIZE REF
-	int map_size = (cellList.cells.size() / 5) + 1;
-	// cerr << "MAP SIZE = " << map_size << endl;
+	cellList.map_size = (cellList.cells.size() / 5) + 1;
+	// cerr << "MAP SIZE = " << cellList.map_size << endl;
 
 	int egg_value = 10;
 	int	crystal_value = 10;
@@ -390,7 +403,7 @@ void	set_cells_value()
 	else if (cellList.potential_ants % 2 == 1 && cellList.ally_ants >= (cellList.potential_ants + 1) / 2)
 		egg_value = 0;
 	else
-		egg_value = 20;
+		egg_value = 30;
 
 	if (cellList.curr_crystal < cellList.init_cystals / 4)
 		crystal_value = 30;
@@ -404,46 +417,39 @@ void	set_cells_value()
 			continue;
 		}
 
+		// GET QUANTITY OF RESSOURCE COMPARED TO ALL AVAILABLE
+		int weight = 1;
+		// if (cells[i].type == EGG)
+		// 	weight = cells[i].initial_resource * 100 / cellList.init_eggs;
+		// else if (cells[i].type == CRYSTAL)
+		// 	weight = cells[i].initial_resource * 100 / cellList.init_cystals;
+		// cerr << "WEIGHT OF CELL " << cells[i].self_index << " IS " << weight << endl;
+
+		// DISTANCE VALUES
 		int dist_value = 0;
+
 		// GET DISTANCE FROM NEAREST ALLY BASE
-		int dist_min_ally = 10000;
-		for (int base = 0; base < cellList.ally_base_indexes.size(); base++)
-		{
-			int temp = cells[i].get_dist_index(cellList.ally_base_indexes[base]);
-			if (temp < dist_min_ally)
-				dist_min_ally = temp;
-		}
+		int dist_min_ally = get_nearest_in_indexes(cells[i], cellList.ally_base_indexes);
 
 		// GET DISTANCE FROM NEAREST ENNEMY BASE
-		int dist_min_oppo = 10000;
-		for (int base = 0; base < cellList.oppo_base_indexes.size(); base++)
-		{
-			int temp = cells[i].get_dist_index(cellList.oppo_base_indexes[base]);
-			if (temp < dist_min_oppo)
-				dist_min_oppo = temp;
-		}
+		int dist_min_oppo = get_nearest_in_indexes(cells[i], cellList.oppo_base_indexes);
 
-		if (dist_min_ally > dist_min_oppo)
+		// NULLIFY VALUE IF TOO FAR FROM A BASE 
+		if (dist_min_ally > cellList.ally_ants)
+			dist_value = 0;
+		else if (dist_min_ally > dist_min_oppo)
 			dist_value = 0 - dist_min_ally;
 		else if (dist_min_ally == dist_min_oppo)
-			dist_value = 2 * map_size - dist_min_ally;
+			dist_value = 2 * cellList.map_size - dist_min_ally;
 		else
-			dist_value = map_size - dist_min_ally + dist_min_oppo;
-
-		// GET QUANTITY OF RESSOURCE COMPARED TO ALL AVAILABLE
-		int weight = 0;
-		// if (cells[i].type == EGG)
-		// 	weight = 100 * cells[i].initial_resource / cellList.init_eggs;
-		// else if (cells[i].type == CRYSTAL)
-		// 	weight = 100 * cells[i].initial_resource / cellList.init_cystals;
-		// cerr << "WEIGHT OF CELL " << cells[i].self_index << " IS " << weight << endl;
+			dist_value = cellList.map_size - dist_min_ally;
 
 		// SET VALUE FOR THIS CELL
 		if (cells[i].type == EGG)
-			cells[i].value = egg_value * dist_value;
+			cells[i].value = egg_value * weight * dist_value;
 		else if (cells[i].type == CRYSTAL)
-			cells[i].value = crystal_value * dist_value;
-		// cerr << "VALUE OF CELL " << cells[i].self_index << " IS " << cells[i].value << endl;
+			cells[i].value = crystal_value * weight * dist_value;
+		// cerr << "VALUE" << cells[i].self_index << "=" << cells[i].value << " DIST=" << dist_value << " ALLY=" << dist_min_ally << " OPPO=" << dist_min_oppo << endl;
 	}
 }
 
@@ -452,7 +458,7 @@ void	sort_cells_by_value(vector<Cell> &cells)
 	std::sort(cells.begin(), cells.end(), [](Cell a, Cell b) {return (a.value > b.value);});
 }
 
-bool	am_I_too_rich(vector<Cell>	&target_cells)
+bool	am_I_too_rich(vector<Cell>	&target_cells, Cell curr_cell)
 {
 	int		crystal_count = cellList.my_crystals;
 
@@ -461,16 +467,15 @@ bool	am_I_too_rich(vector<Cell>	&target_cells)
 		if (target_cells[i].type == CRYSTAL)
 			crystal_count += target_cells[i].current_resource;
 	}
+	// crystal_count += curr_cell.current_resource;
+	// cerr << "HAVE " << cellList.my_crystals  << " MAP " << cellList.init_cystals << " CRYST COUNT " << crystal_count << endl;
 
-	if (cellList.my_crystals % 2 == 1 && crystal_count >= (cellList.my_crystals + 1) / 2)
+	if (cellList.init_cystals % 2 == 1 && crystal_count >= (cellList.init_cystals + 1) / 2)
 		return (true);
-	if (cellList.my_crystals % 2 == 0 && crystal_count >= cellList.my_crystals / 2)
+	if (cellList.init_cystals % 2 == 0 && crystal_count >= cellList.init_cystals / 2)
 		return (true);
 	return (false);
 }
-
-// DEFINE RANGE TO SEARCH FOR PRIORITY CELLS
-int						max_range = 5;
 
 vector<vector<Cell>>	generate_priority_cells()
 {
@@ -480,7 +485,6 @@ vector<vector<Cell>>	generate_priority_cells()
 
 	int max_target = (cellList.ally_ants / 10) + 1;
 
-	// 
 	vector<Cell>	cells_for_base;
 	for (int i = 0 ; i < cellList.cells.size(); i++)
 		if (cellList.cells[i].current_resource)
@@ -492,11 +496,11 @@ vector<vector<Cell>>	generate_priority_cells()
 	{
 		// cerr << "TARGET " << cells_for_base[i].self_index << " VALUE " << cells_for_base[i].value << endl;
 		target_cell.push_back(cells_for_base[i]);
+		if (am_I_too_rich(target_cell, cells_for_base[i]) && target_cell.size() >= 1)
+			break;
 		// TO AVOID GOING TOO MUCH TOWARD LOW VALUE CELL
-		// if (am_I_too_rich(target_cell));
-		// 	break;
 		if (cells_for_base[i].value <= 0)
-			break;	
+			i++;
 	}
 	cells_to_link.push_back(target_cell);
 
@@ -525,7 +529,6 @@ void	go_little_ants()
 	// INIT INITIAL LIST OF RESSOURCE CELLS + ALLY BASES
 	vector<int>				best_path;
 	vector<vector<Cell>>	cells_to_link = generate_priority_cells();
-
 	// ADD BASES AS STARTING POINT FOR LINKING
 	vector<int>		linked_cell_indexes;
 	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
@@ -556,10 +559,12 @@ void	go_little_ants()
 		for (int i = 0; i < full_path.size(); i++)
 		{
 			int strength = 1;
-			if (cellList.cells[full_path[i]].oppo_base)
-				strength = 3;
+			// if (cellList.cells[full_path[i]].oppo_base)
+			// 	strength = 3;
 			BEACON(full_path[i], strength);
 		}
+		if (full_path.empty())
+			cout << "WAIT;";
 	}
 }
 
@@ -607,7 +612,11 @@ int main()
     //// GAME LOOP  ////
     while (1) {
         //// MAP UPDATE ////
-
+		int my_score;
+        int opp_score;
+        cin >> my_score >> opp_score; cin.ignore();
+		cellList.my_crystals = my_score;
+		cellList.oppo_crystals = opp_score;
         cellList.set_ants(0, 0); // reset ants before recounting them
         for (int i = 0; i < number_of_cells; i++) {
             int resources; // the current amount of eggs/crystals on this cell

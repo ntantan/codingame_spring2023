@@ -42,3 +42,6 @@ Piste d'améliorations :
 - Calculer la combinaisons de cellules precises pour gagner
 - Avant de prendre une nouvelle target, checker si les cellules que l'on a est suffisant pour win 
 - Pathfinding sans indice -> Choisir la cellule qui est la plus proche d'une autre cellule
+
+seed=4957399276813445000
+albert_998
