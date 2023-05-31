@@ -45,3 +45,7 @@ Piste d'améliorations :
 
 seed=4957399276813445000
 albert_998
+
+-> retenir tous les points de passages potentiels
+-> refaire tous les paths possible
+-> compter les ressources sur chaque path

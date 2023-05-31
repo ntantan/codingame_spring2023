@@ -321,10 +321,7 @@ int		CellList::best_neighboor(vector<int> parent_cells, Cell child_cell)
 			|| this->cells[parent_cells[i]].current_resource > 0
 			|| this->cells[parent_cells[i]].ally_ants > 0))
 			return (parent_cells[i]);
-			// interesting_neigh.push_back(parent_cells[i]);
 	}
-	// if (!interesting_neigh.empty())
-	// 	return (most_popular_neigh(interesting_neigh));
 
 	vector<int> normal_neigh;
 	for (int i = 0; i < parent_cells.size(); i++)
@@ -343,21 +340,23 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 {
 	Cell cell_1 = this->cells[index1]; // 0
 	Cell cell_2 = this->cells[index2]; // 13
-	int dist = 0;
+	// int dist = 0;
 
-	for (int i = 0; i < cell_1.cells_from_cell.size(); i++)
-	{
-		for (int j = 0; j < cell_1.cells_from_cell[i].size(); j++)
-		{
-			if (cell_1.cells_from_cell[i][j] == cell_2.self_index)
-			{
-				dist = i; // dist = 3
-				goto stop;
-			}
-		}
-	}
+	// for (int i = 0; i < cell_1.cells_from_cell.size(); i++)
+	// {
+	// 	for (int j = 0; j < cell_1.cells_from_cell[i].size(); j++)
+	// 	{
+	// 		if (cell_1.cells_from_cell[i][j] == cell_2.self_index)
+	// 		{
+	// 			dist = i; // dist = 3
+	// 			goto stop;
+	// 		}
+	// 	}
+	// }
 
-	stop:
+	// stop:
+	int dist = this->cells[index1].get_dist_index(index2);
+
 	vector<int> path;
 	int point = cell_2.self_index; // = 13
 	path.push_back(cell_2.self_index);
@@ -368,6 +367,9 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 		point = best_neigh;
 	}
 	return (path);
+
+	// vector<vector<int>>	all_points;
+	// vector<int> row = cell_1.cells_from_cell
 }
 
 void    CellList::add_cell(Cell new_cell)
