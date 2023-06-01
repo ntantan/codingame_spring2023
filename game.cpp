@@ -340,36 +340,63 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 {
 	Cell cell_1 = this->cells[index1]; // 0
 	Cell cell_2 = this->cells[index2]; // 13
-	// int dist = 0;
 
-	// for (int i = 0; i < cell_1.cells_from_cell.size(); i++)
-	// {
-	// 	for (int j = 0; j < cell_1.cells_from_cell[i].size(); j++)
-	// 	{
-	// 		if (cell_1.cells_from_cell[i][j] == cell_2.self_index)
-	// 		{
-	// 			dist = i; // dist = 3
-	// 			goto stop;
-	// 		}
-	// 	}
-	// }
-
-	// stop:
 	int dist = this->cells[index1].get_dist_index(index2);
 
-	vector<int> path;
-	int point = cell_2.self_index; // = 13
-	path.push_back(cell_2.self_index);
+	vector<vector<int>> all_paths;
+	all_paths.push_back(vector<int> (1, cell_2.self_index)); // {[11]}
+
+	// cerr << "PATH " << index1 << " TO " << index2 << endl;
 	while (dist--)
 	{
-		int best_neigh = best_neighboor(cell_1.cells_from_cell[dist], this->cells[point]);
-		path.push_back(best_neigh);
-		point = best_neigh;
+		vector<vector<int>> new_paths;
+		for (int i = 0; i < all_paths.size(); i++)
+		{
+			for (int j = 0; j < cell_1.cells_from_cell[dist].size(); j++)
+			{
+				if (this->is_neighboor(all_paths[i].back(), cell_1.cells_from_cell[dist][j]))
+				{
+					vector<int> temp;
+					temp.assign(all_paths[i].begin(), all_paths[i].end());
+					temp.push_back(cell_1.cells_from_cell[dist][j]);
+					new_paths.push_back(temp);
+				}
+			}
+		}
+		all_paths = new_paths;
 	}
-	return (path);
 
-	// vector<vector<int>>	all_points;
-	// vector<int> row = cell_1.cells_from_cell
+	// cerr << "ALL PATH = " << endl;
+	// for (int i = 0; i < all_paths.size(); i++)
+	// {
+	// 	cerr << "[" << i << "]: ";
+	// 	for (int j = 0; j < all_paths[i].size(); j++)
+	// 	{
+	// 		cerr << " ["<< all_paths[i][j] << "]";
+	// 	}
+	// 	cerr << endl;
+	// }
+
+	int max = 0;
+	vector<int> best_path = all_paths[0];
+	for (int i = 0; i < all_paths.size(); i++)
+	{
+		int count = 0;
+		for (int j = 0; j < all_paths[i].size(); j++)
+		{
+			if (this->cells[all_paths[i][j]].current_resource)
+				count += this->cells[all_paths[i][j]].initial_resource;
+			else
+				count += 0;
+		}
+		if (count > max)
+		{
+			max = count;
+			best_path = all_paths[i];
+		}
+	}
+
+	return (best_path);
 }
 
 void    CellList::add_cell(Cell new_cell)
@@ -569,7 +596,7 @@ int 	best_start_link(vector<int> &linked_cell_indexes, Cell target)
 			if (count > max)
 			{
 				max = count;
-				cerr << "GOING FROM " << nearest_points[i] << " TO " << target.self_index << " IS BETTER THAN " << nearest_cell << " TO " << target.self_index << endl; 
+				// cerr << "GOING FROM " << nearest_points[i] << " TO " << target.self_index << " IS BETTER THAN " << nearest_cell << " TO " << target.self_index << endl; 
 				nearest_cell = nearest_points[i];
 			}
 		}

@@ -49,3 +49,8 @@ albert_998
 -> retenir tous les points de passages potentiels
 -> refaire tous les paths possible
 -> compter les ressources sur chaque path
+
+-> Ameliorer repartition des fourmis sur un path
+
+seed=5763675996854108000
+valgrowth
