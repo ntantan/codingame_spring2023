@@ -53,4 +53,4 @@ albert_998
 -> Ameliorer repartition des fourmis sur un path
 
 seed=5763675996854108000
-valgrowth
+maitre valgrowth

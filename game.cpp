@@ -388,6 +388,7 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 				count += this->cells[all_paths[i][j]].initial_resource;
 			else
 				count += 0;
+			// TAKE INTO ACCOUNT BEACONS
 		}
 		if (count > max)
 		{
@@ -644,6 +645,8 @@ void	go_little_ants()
 			full_path.insert(full_path.end(), path.begin(), path.end());
 			cells_to_link_base_i.erase(it);
 		}
+
+		// REMOVE ALL BELOW AND SET BACON TO TRUE IN THE LOOP ABOVE 
 
 		// CLEAN DOUBLE BEACON
 		std::sort(full_path.begin(), full_path.end());
