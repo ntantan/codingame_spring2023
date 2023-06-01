@@ -3,22 +3,15 @@
 #include <vector>
 #include <algorithm>
 
+#include <chrono>
+using namespace std::chrono;
+
 using namespace std;
 
 ///////// HELPER /////////
 
 #define     EGG         1
 #define     CRYSTAL     2
-
-void    LINE(int origin, int target, int strength)
-{
-    cout << "LINE " << origin << " " << target << " " << strength << ";";
-}
-
-void	BEACON(int index, int strength)
-{
-	cout << "BEACON " << index << " " << strength << ";";
-}
 
 ///////// CELL CLASS /////////
 
@@ -35,7 +28,7 @@ class Cell
         int                 oppo_ants;
 
         int                 self_index;
-		int					beaconed;
+		bool				beaconed;
 		bool				ally_base;
 		bool				oppo_base;
 
@@ -67,7 +60,7 @@ Cell::Cell(int _type, int _initial_resource, int _self_index, int _neigh_0, int 
     this->oppo_ants = 0;
 	this->ally_base = false;
 	this->oppo_base = false;
-	this->beaconed = 0;
+	this->beaconed = false;
 	this->nearest_base = 0;
 	this->value = 0;
 }
@@ -90,6 +83,7 @@ void    Cell::update_cell(int _ressources, int _ally_ants, int _oppo_ants)
     this->current_resource = _ressources;
     this->ally_ants = _ally_ants;
     this->oppo_ants = _oppo_ants;
+	this->beaconed = false;
 }
 
 void    Cell::print_cell(string msg)
@@ -386,8 +380,8 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 		{
 			if (this->cells[all_paths[i][j]].current_resource)
 				count += this->cells[all_paths[i][j]].initial_resource;
-			else
-				count += 0;
+			if (this->cells[all_paths[i][j]].beaconed)
+				count += 1;
 			// TAKE INTO ACCOUNT BEACONS
 		}
 		if (count > max)
@@ -423,6 +417,18 @@ void    CellList::print_cells()
 CellList    cellList;
 
 ///////// STRATEGY FUNCTION /////////
+
+void    LINE(int origin, int target, int strength)
+{
+    cout << "LINE " << origin << " " << target << " " << strength << ";";
+}
+
+void	BEACON(int index, int strength)
+{
+
+	cellList.cells[index].beaconed = true;
+	cout << "BEACON " << index << " " << strength << ";";
+}
 
 int		get_nearest_in_indexes(Cell cell, vector<int> indexes)
 {
@@ -618,7 +624,6 @@ void	sort_cells_by_distance(vector<Cell> &cells)
 void	go_little_ants()
 {
 	// INIT INITIAL LIST OF RESSOURCE CELLS + ALLY BASES
-	vector<int>				best_path;
 	vector<vector<Cell>>	cells_to_link = generate_priority_cells();
 	// ADD BASES AS STARTING POINT FOR LINKING
 	vector<int>		linked_cell_indexes;
@@ -626,44 +631,45 @@ void	go_little_ants()
 		linked_cell_indexes.push_back(cellList.ally_base_indexes[i]);
 
 	// BEACON ONE OR MANY MAPS DEPENDING ON CELLS TO LINK
-	for (int base = 0; base < cells_to_link.size(); base++)
+	// for (int base = 0; base < cells_to_link.size(); base++)
+	// {
+	// 	cerr << "BASE" << endl;
+	vector<Cell>	cells_to_link_base_i = cells_to_link[0];
+	vector<int> 	full_path;
+	
+	// DEFINE PATH
+	sort_cells_by_distance(cells_to_link_base_i);
+	for (vector<Cell>::iterator it = cells_to_link_base_i.begin(); it != cells_to_link_base_i.end();)
 	{
-		vector<Cell>	cells_to_link_base_i = cells_to_link[base];
-		vector<int> 	full_path;
-		
-		// DEFINE PATH
-		sort_cells_by_distance(cells_to_link_base_i);
-		for (vector<Cell>::iterator it = cells_to_link_base_i.begin(); it != cells_to_link_base_i.end();)
-		{
-			int best_start = best_start_link(linked_cell_indexes, *it);
-			linked_cell_indexes.push_back((*it).self_index);
-			vector<int> path = cellList.path_index_to_index((*it).self_index, best_start);
-			// cerr << "FROM CELL " << (*it).self_index << ": ";
-			// for (int i = 0; i < path.size(); i++)
-			// 	cerr << " " << path[i];
-			// cerr << endl;
-			full_path.insert(full_path.end(), path.begin(), path.end());
-			cells_to_link_base_i.erase(it);
-		}
-
-		// REMOVE ALL BELOW AND SET BACON TO TRUE IN THE LOOP ABOVE 
-
-		// CLEAN DOUBLE BEACON
-		std::sort(full_path.begin(), full_path.end());
-		auto last = std::unique(full_path.begin(), full_path.end());
-		full_path.erase(last, full_path.end());
-
-		// GO GO GO GO
-		for (int i = 0; i < full_path.size(); i++)
-		{
-			int strength = 1;
-			// if (cellList.cells[full_path[i]].oppo_base)
-			// 	strength = 3;
-			BEACON(full_path[i], strength);
-		}
-		if (full_path.empty())
-			cout << "WAIT;";
+		int best_start = best_start_link(linked_cell_indexes, *it);
+		linked_cell_indexes.push_back((*it).self_index);
+		vector<int> path = cellList.path_index_to_index((*it).self_index, best_start);
+		// cerr << "FROM CELL " << (*it).self_index << ": ";
+		// for (int i = 0; i < path.size(); i++)
+		// 	cerr << " " << path[i];
+		// cerr << endl;
+		full_path.insert(full_path.end(), path.begin(), path.end());
+		cells_to_link_base_i.erase(it);
 	}
+
+	// REMOVE ALL BELOW AND SET BACON TO TRUE IN THE LOOP ABOVE 
+
+	// CLEAN DOUBLE BEACON
+	std::sort(full_path.begin(), full_path.end());
+	auto last = std::unique(full_path.begin(), full_path.end());
+	full_path.erase(last, full_path.end());
+
+	// GO GO GO GO
+	for (int i = 0; i < full_path.size(); i++)
+	{
+		int strength = 1;
+		// if (cellList.cells[full_path[i]].oppo_base)
+		// 	strength = 3;
+		BEACON(full_path[i], strength);
+	}
+	if (full_path.empty())
+		cout << "WAIT;";
+	// }
 }
 
 ///////// STRATEGY FUNCTION /////////
@@ -710,6 +716,7 @@ int main()
 
     //// GAME LOOP  ////
     while (1) {
+		// auto start = high_resolution_clock::now();
         //// MAP UPDATE ////
 		int my_score;
         int opp_score;
@@ -733,6 +740,9 @@ int main()
 		go_little_ants();
 
         cout << endl;
+		// auto stop = high_resolution_clock::now();
+		// auto duration = duration_cast<microseconds>(stop - start);
+		// cerr << "TIME: " << duration.count() << endl;
     }
     //// END OF GAME LOOP ////
 }
