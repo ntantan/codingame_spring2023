@@ -28,12 +28,14 @@ class Cell
         int                 oppo_ants;
 
         int                 self_index;
-		bool				beaconed;
+		int				beaconed;
 		bool				ally_base;
 		bool				oppo_base;
 
 		int					nearest_base;
-		int					value;  
+		int					value;
+
+		int					strength;
     
     public:
         Cell(int _type, int _initial_resource, int self_index, int _neigh_0, int _neigh_1, int _neigh_2, int _neigh_3, int _neigh_4, int _neigh_5);
@@ -60,9 +62,10 @@ Cell::Cell(int _type, int _initial_resource, int _self_index, int _neigh_0, int 
     this->oppo_ants = 0;
 	this->ally_base = false;
 	this->oppo_base = false;
-	this->beaconed = false;
+	this->beaconed = 0;
 	this->nearest_base = 0;
 	this->value = 0;
+	this->strength = 0;
 }
 
 int		Cell::get_dist_index(int index)
@@ -83,7 +86,8 @@ void    Cell::update_cell(int _ressources, int _ally_ants, int _oppo_ants)
     this->current_resource = _ressources;
     this->ally_ants = _ally_ants;
     this->oppo_ants = _oppo_ants;
-	this->beaconed = false;
+	this->beaconed = 0;
+	this->strength = 0;
 }
 
 void    Cell::print_cell(string msg)
@@ -416,6 +420,41 @@ void    CellList::print_cells()
 
 CellList    cellList;
 
+
+///////// PATH VALUE CLASS /////////
+
+class ValuePath
+{
+	public:
+		ValuePath(vector<int> _path, int _path_value);
+
+	public:
+		int				path_value;
+
+		vector<int> 	indexes;
+		vector<int> 	strength;
+
+		vector<Cell> 	cells;
+
+	public:
+	
+};
+
+ValuePath::ValuePath(vector<int> _path, int _path_value)
+{
+	for (int i = 0; i < _path.size(); i++)
+	{
+		this->cells.push_back(cellList.cells[_path[i]]);
+	}
+	this->path_value = _path_value;
+	this->indexes = _path;
+}
+
+///////// END OF PATH VALUE CLASS /////////
+
+// ValuePath	all_path;
+
+
 ///////// STRATEGY FUNCTION /////////
 
 void    LINE(int origin, int target, int strength)
@@ -425,9 +464,11 @@ void    LINE(int origin, int target, int strength)
 
 void	BEACON(int index, int strength)
 {
-
-	cellList.cells[index].beaconed = true;
-	cout << "BEACON " << index << " " << strength << ";";
+	if (strength > 0 && strength > cellList.cells[index].beaconed)
+	{
+		cellList.cells[index].beaconed = strength;
+		cout << "BEACON " << index << " " << cellList.cells[index].beaconed << ";";
+	}
 }
 
 int		get_nearest_in_indexes(Cell cell, vector<int> indexes)
@@ -467,6 +508,13 @@ void	set_cells_value()
 
 	if (cellList.curr_crystal < cellList.init_cystals / 4)
 		crystal_value = 30;
+	
+	cerr << cellList.curr_ants << " AAAA" << endl;
+	if (cellList.ally_ants >= cellList.init_cystals / 4)
+	{
+		egg_value = 10;
+		crystal_value = 30;
+	}
 
 	// FOR EACH CELL
 	for (int i = 0; i < cells.size(); i++)
@@ -630,12 +678,9 @@ void	go_little_ants()
 	for (int i = 0; i < cellList.ally_base_indexes.size(); i++)
 		linked_cell_indexes.push_back(cellList.ally_base_indexes[i]);
 
-	// BEACON ONE OR MANY MAPS DEPENDING ON CELLS TO LINK
-	// for (int base = 0; base < cells_to_link.size(); base++)
-	// {
-	// 	cerr << "BASE" << endl;
 	vector<Cell>	cells_to_link_base_i = cells_to_link[0];
 	vector<int> 	full_path;
+	vector<ValuePath>		all_paths;
 	
 	// DEFINE PATH
 	sort_cells_by_distance(cells_to_link_base_i);
@@ -644,32 +689,112 @@ void	go_little_ants()
 		int best_start = best_start_link(linked_cell_indexes, *it);
 		linked_cell_indexes.push_back((*it).self_index);
 		vector<int> path = cellList.path_index_to_index((*it).self_index, best_start);
-		// cerr << "FROM CELL " << (*it).self_index << ": ";
-		// for (int i = 0; i < path.size(); i++)
-		// 	cerr << " " << path[i];
-		// cerr << endl;
+		all_paths.push_back(ValuePath(path, (*it).value));
 		full_path.insert(full_path.end(), path.begin(), path.end());
 		cells_to_link_base_i.erase(it);
 	}
 
-	// REMOVE ALL BELOW AND SET BACON TO TRUE IN THE LOOP ABOVE 
-
-	// CLEAN DOUBLE BEACON
+	// CLEAN DOUBLE BEACON AND COUNT TOTAL CELLS
 	std::sort(full_path.begin(), full_path.end());
 	auto last = std::unique(full_path.begin(), full_path.end());
 	full_path.erase(last, full_path.end());
+	int full_path_size = full_path.size();
 
 	// GO GO GO GO
 	for (int i = 0; i < full_path.size(); i++)
 	{
 		int strength = 1;
-		// if (cellList.cells[full_path[i]].oppo_base)
-		// 	strength = 3;
 		BEACON(full_path[i], strength);
 	}
+
 	if (full_path.empty())
 		cout << "WAIT;";
+
+	// EXPERIMENTAL
+	// for (int i = 0; i < all_paths.size(); i++)
+	// {
+	// 	cerr << "PATH " << i << " : ";
+	// 	for (int j = 0; j < all_paths[i].indexes.size(); j++)
+	// 	{
+	// 		cerr << all_paths[i].indexes[j] << " "; 
+	// 	}
+	// 	cerr << endl;
 	// }
+
+	// for (int i = 0; i < all_paths.size(); i++)
+	// {
+	// 	ValuePath curr_path = all_paths[i];
+	// 	int curr_ants = 0;
+	// 	int path_size = 0;
+	// 	int total_path_ants = 0;
+
+	// 	for (int j = 0; j < curr_path.cells.size(); j++)
+	// 		curr_ants += curr_path.cells[j].ally_ants;
+
+	// 	if (i == 0)
+	// 		path_size = curr_path.cells.size();
+	// 	else
+	// 		path_size = curr_path.cells.size();
+
+	// 	total_path_ants = (path_size * cellList.ally_ants) / full_path_size;
+		
+	// 	cerr << "CURRENT ANTS " << curr_ants << " TOTAL PATH ANTS " << total_path_ants << endl;
+
+	// 	// if (curr_ants <= total_path_ants / 2 && curr_path.cells.back().ally_ants < total_path_ants / path_size)
+	// 	// {
+	// 	// 	curr_path.cells.front().strength = total_path_ants / path_size;
+	// 	// 	curr_path.cells.back().strength = total_path_ants - (total_path_ants / path_size);
+	// 	// }
+	// 	// else if (curr_ants > total_path_ants / 2 && curr_path.cells.back().ally_ants < total_path_ants / path_size)
+	// 	// {
+	// 	// 	int total_str = curr_ants;
+	// 	// 	// for (int z = curr_path.cells.size() - 2; z >= 0; z--)
+	// 	// 	// {
+	// 	// 	// 	int prev_need = (total_path_ants / path_size) - curr_path.cells[z + 1].ally_ants;
+	// 	// 	// 	cerr << "PREV NEED " << curr_path.cells[z].self_index << " : " << prev_need << endl;
+	// 	// 	// 	curr_path.cells[z].strength = curr_path.cells[z].ally_ants - prev_need;
+	// 	// 	// 	total_str -= curr_path.cells[z].ally_ants - prev_need;
+	// 	// 	// }
+	// 	// 	// curr_path.cells.back().strength = total_str;
+	// 	// 	// for (int z = curr_path.cells.size() - 1; z >= 0; z--)
+	// 	// 	// {
+
+	// 	// 	// }
+	// 	// 	curr_path.cells.front().strength =  (total_str / 2) / path_size;
+	// 	// 	curr_path.cells[path_size / 2].strength = (total_str / 2) / path_size;
+	// 	// 	curr_path.cells.back().strength =  total_str / path_size;
+	// 	// }
+	// 	// else
+	// 	// {
+	// 	// 	for (int y = 0; y < curr_path.cells.size(); y++)
+	// 	// 	{
+	// 	// 		curr_path.cells[y].strength = total_path_ants / path_size;
+	// 	// 	}
+	// 	// }
+
+	// 	if (curr_path.cells.back().ally_ants < total_path_ants / path_size)
+	// 	{
+	// 		for (int y = 0; y < curr_path.cells.size(); y++)
+	// 			curr_path.cells[y].strength = 1;
+	// 		curr_path.cells.back().strength = total_path_ants / path_size;
+	// 		cerr << "AAAAAAAAAA" << endl;
+	// 	}
+	// 	else
+	// 	{
+	// 		for (int y = 0; y < curr_path.cells.size(); y++)
+	// 			curr_path.cells[y].strength = 1;
+	// 	}
+
+	// 	for (int m = 0; m < curr_path.cells.size(); m++)
+	// 	{
+	// 		cerr << "BEACON " << curr_path.cells[m].self_index << " STR " << curr_path.cells[m].strength << endl; 
+	// 		BEACON(curr_path.cells[m].self_index, curr_path.cells[m].strength);
+	// 	}
+	// }
+
+	// if (full_path.empty())
+	// 	cout << "WAIT;";
+
 }
 
 ///////// STRATEGY FUNCTION /////////
