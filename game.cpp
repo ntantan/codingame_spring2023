@@ -137,6 +137,7 @@ class CellList
 		int				my_crystals;
 		int				oppo_crystals;
 		int				map_size;
+		bool			egg_phase;
     
     public:
         void            add_cell(Cell new_cell);
@@ -209,6 +210,7 @@ void    CellList::set_distance(Cell &cell)
         }
 		if (child_cells.empty())
 			break;
+		std::sort(child_cells.begin(), child_cells.end());
 		cell.cells_from_cell.push_back(child_cells);
     }
 }
@@ -386,6 +388,8 @@ vector<int>		CellList::path_index_to_index(int index1, int index2)
 				count += this->cells[all_paths[i][j]].initial_resource;
 			if (this->cells[all_paths[i][j]].beaconed)
 				count += 1;
+			if (this->cells[all_paths[i][j]].ally_ants)
+				count += 1;
 			// TAKE INTO ACCOUNT BEACONS
 		}
 		if (count > max)
@@ -467,7 +471,7 @@ void	BEACON(int index, int strength)
 	if (strength > 0 && strength > cellList.cells[index].beaconed)
 	{
 		cellList.cells[index].beaconed = strength;
-		cout << "BEACON " << index << " " << cellList.cells[index].beaconed << ";";
+		cout << "BEACON " << index << " " << strength << ";";
 	}
 }
 
@@ -506,15 +510,10 @@ void	set_cells_value()
 	else
 		egg_value = 30;
 
+	(cellList.ally_ants <= cellList.potential_ants / 4 ? cellList.egg_phase = true : cellList.egg_phase = false);
+
 	if (cellList.curr_crystal < cellList.init_cystals / 4)
 		crystal_value = 30;
-	
-	cerr << cellList.curr_ants << " AAAA" << endl;
-	if (cellList.ally_ants >= cellList.init_cystals / 4)
-	{
-		egg_value = 10;
-		crystal_value = 30;
-	}
 
 	// FOR EACH CELL
 	for (int i = 0; i < cells.size(); i++)
@@ -542,15 +541,28 @@ void	set_cells_value()
 		// GET DISTANCE FROM NEAREST ENNEMY BASE
 		int dist_min_oppo = get_nearest_in_indexes(cells[i], cellList.oppo_base_indexes);
 
-		// NULLIFY VALUE IF TOO FAR FROM A BASE 
-		if (dist_min_ally > cellList.ally_ants)
-			dist_value = 0;
-		else if (dist_min_ally > dist_min_oppo)
-			dist_value = 0 - dist_min_ally;
-		else if (dist_min_ally == dist_min_oppo)
-			dist_value = 2 * cellList.map_size - dist_min_ally;
+		// NULLIFY VALUE IF TOO FAR FROM A BASE
+
+		if (cellList.egg_phase && cells[i].type == EGG)
+		{
+			if (dist_min_ally > dist_min_oppo)
+				dist_value = 0 - dist_min_ally;
+			else if (dist_min_ally == dist_min_oppo)
+				dist_value = cellList.map_size - dist_min_ally;
+			else
+				dist_value = 2 * cellList.map_size - dist_min_ally;
+		}
 		else
-			dist_value = cellList.map_size - dist_min_ally;
+		{
+			if (dist_min_ally > cellList.ally_ants)
+				dist_value = 0;
+			else if (dist_min_ally > dist_min_oppo)
+				dist_value = 0 - dist_min_ally;
+			else if (dist_min_ally == dist_min_oppo)
+				dist_value = 2 * cellList.map_size - dist_min_ally;
+			else
+				dist_value = cellList.map_size - dist_min_ally;
+		}
 
 		// SET VALUE FOR THIS CELL
 		if (cells[i].type == EGG)
@@ -647,6 +659,8 @@ int 	best_start_link(vector<int> &linked_cell_indexes, Cell target)
 			{
 				if (cellList.cells[path[i]].current_resource)
 					count++;
+				if (cellList.cells[path[i]].ally_ants)
+					count++;
 			}
 			if (count > max)
 			{
@@ -700,100 +714,144 @@ void	go_little_ants()
 	full_path.erase(last, full_path.end());
 	int full_path_size = full_path.size();
 
-	// GO GO GO GO
-	for (int i = 0; i < full_path.size(); i++)
+	if (full_path.empty())
 	{
-		int strength = 1;
-		BEACON(full_path[i], strength);
+		cout << "WAIT;";
+		return;
 	}
 
-	if (full_path.empty())
-		cout << "WAIT;";
+	// // GO GO GO GO
+	if (cellList.egg_phase)
+	{
+		for (int i = 0; i < full_path.size(); i++)
+		{
+			int strength = 1;
+			BEACON(full_path[i], strength);
+		}
+	}
+	else
+	{
+		// EXPERIMENTAL
+		for (int i = 0; i < all_paths.size(); i++)
+		{
+			cerr << "PATH " << i << " : ";
+			for (int j = 0; j < all_paths[i].indexes.size(); j++)
+			{
+				cerr << all_paths[i].indexes[j] << " "; 
+			}
+			cerr << endl;
+		}
 
-	// EXPERIMENTAL
-	// for (int i = 0; i < all_paths.size(); i++)
-	// {
-	// 	cerr << "PATH " << i << " : ";
-	// 	for (int j = 0; j < all_paths[i].indexes.size(); j++)
-	// 	{
-	// 		cerr << all_paths[i].indexes[j] << " "; 
-	// 	}
-	// 	cerr << endl;
-	// }
+		for (int i = 0; i < all_paths.size(); i++)
+		{
+			ValuePath curr_path = all_paths[i];
+			int curr_ants = 0;
+			int path_size = 0;
+			int total_path_ants = 0;
+			int	ants_per_cell = 0;
 
-	// for (int i = 0; i < all_paths.size(); i++)
-	// {
-	// 	ValuePath curr_path = all_paths[i];
-	// 	int curr_ants = 0;
-	// 	int path_size = 0;
-	// 	int total_path_ants = 0;
+			for (int j = 0; j < curr_path.cells.size(); j++)
+				curr_ants += curr_path.cells[j].ally_ants;
 
-	// 	for (int j = 0; j < curr_path.cells.size(); j++)
-	// 		curr_ants += curr_path.cells[j].ally_ants;
+			if (i == 0)
+				path_size = curr_path.cells.size();
+			else
+				path_size = curr_path.cells.size() - 1;
 
-	// 	if (i == 0)
-	// 		path_size = curr_path.cells.size();
-	// 	else
-	// 		path_size = curr_path.cells.size();
+			total_path_ants = (path_size * cellList.ally_ants) / full_path_size;
 
-	// 	total_path_ants = (path_size * cellList.ally_ants) / full_path_size;
-		
-	// 	cerr << "CURRENT ANTS " << curr_ants << " TOTAL PATH ANTS " << total_path_ants << endl;
+			ants_per_cell = total_path_ants / path_size;
 
-	// 	// if (curr_ants <= total_path_ants / 2 && curr_path.cells.back().ally_ants < total_path_ants / path_size)
-	// 	// {
-	// 	// 	curr_path.cells.front().strength = total_path_ants / path_size;
-	// 	// 	curr_path.cells.back().strength = total_path_ants - (total_path_ants / path_size);
-	// 	// }
-	// 	// else if (curr_ants > total_path_ants / 2 && curr_path.cells.back().ally_ants < total_path_ants / path_size)
-	// 	// {
-	// 	// 	int total_str = curr_ants;
-	// 	// 	// for (int z = curr_path.cells.size() - 2; z >= 0; z--)
-	// 	// 	// {
-	// 	// 	// 	int prev_need = (total_path_ants / path_size) - curr_path.cells[z + 1].ally_ants;
-	// 	// 	// 	cerr << "PREV NEED " << curr_path.cells[z].self_index << " : " << prev_need << endl;
-	// 	// 	// 	curr_path.cells[z].strength = curr_path.cells[z].ally_ants - prev_need;
-	// 	// 	// 	total_str -= curr_path.cells[z].ally_ants - prev_need;
-	// 	// 	// }
-	// 	// 	// curr_path.cells.back().strength = total_str;
-	// 	// 	// for (int z = curr_path.cells.size() - 1; z >= 0; z--)
-	// 	// 	// {
+			int	salt = 0;
+			if (curr_path.cells.back().oppo_ants >= curr_path.cells.back().ally_ants)
+				salt = 1;
+			else if (curr_path.cells.back().current_resource < ants_per_cell)
+				salt = ants_per_cell - curr_path.cells.back().current_resource;
+			
+			
+			cerr << "CURRENT ANTS " << curr_ants << " TOTAL PATH ANTS " << total_path_ants << endl;
+			cerr << "ANTS PER CELL " << ants_per_cell << endl;
 
-	// 	// 	// }
-	// 	// 	curr_path.cells.front().strength =  (total_str / 2) / path_size;
-	// 	// 	curr_path.cells[path_size / 2].strength = (total_str / 2) / path_size;
-	// 	// 	curr_path.cells.back().strength =  total_str / path_size;
-	// 	// }
-	// 	// else
-	// 	// {
-	// 	// 	for (int y = 0; y < curr_path.cells.size(); y++)
-	// 	// 	{
-	// 	// 		curr_path.cells[y].strength = total_path_ants / path_size;
-	// 	// 	}
-	// 	// }
+			if (curr_ants == 0)
+			{
+				curr_path.cells.back().strength = total_path_ants;
+			}
+			else if (curr_ants < total_path_ants)
+			{
+				int ants_left = total_path_ants;
+				curr_path.cells.front().strength = ants_per_cell;
+				for (int j = curr_path.cells.size() - 1; j > 0; j--)
+				{
+					if (curr_path.cells[j].ally_ants)
+					{
+						curr_path.cells[j].strength = curr_ants / path_size;
+						ants_left -= curr_ants / path_size;
+					}
+					else
+					{
+						
+						break;
+					}
+				}
+				for (int j = 1; j < curr_path.cells.size(); j++)
+				{
+					if (curr_path.cells[j].ally_ants)
+					{
+						curr_path.cells[j].strength = curr_ants / path_size;
+						ants_left -= curr_ants / path_size;
+					}
+					else
+					{
+						curr_path.cells[j].strength = ants_left;
+						break;
+					}
+				}
+			}
+			else
+			{
+				int min = (*min_element(curr_path.cells.begin(), curr_path.cells.end(), 
+							[](Cell a, Cell b) {return(a.ally_ants < b.ally_ants);})).ally_ants;
+				vector<int> min_ants;
+				int max_str = total_path_ants;
+				for (int i = 0; i < curr_path.cells.size(); i++)
+				{
+					if (curr_path.cells[i].ally_ants <= min)
+					{
+						min_ants.push_back(curr_path.cells[i].self_index);
+						continue;
+					}
+					int self_ants = curr_path.cells[i].ally_ants;
+					int right_theorical = ants_per_cell * curr_path.cells.size() - 1 - i;
+					int left_theorical = i;
+					int right_ants = 0;
+					for (int j = i + 1; j < curr_path.cells.size(); j++)
+						right_ants += curr_path.cells[j].ally_ants;
+					int left_ants = total_path_ants - right_ants - self_ants;
+					
+					// x < 0 = NEED ANTS ON LEFT, x > 0 = TOO MUCH ANTS ON LEFT
+					int left_stream = left_ants - left_theorical;
+					
+					// x < 0 = NEED ANTS ON RIGHT, x > 0 = TOO MUCH ANTS ON RIGHT
+					int right_stream = right_ants - right_theorical;
 
-	// 	if (curr_path.cells.back().ally_ants < total_path_ants / path_size)
-	// 	{
-	// 		for (int y = 0; y < curr_path.cells.size(); y++)
-	// 			curr_path.cells[y].strength = 1;
-	// 		curr_path.cells.back().strength = total_path_ants / path_size;
-	// 		cerr << "AAAAAAAAAA" << endl;
-	// 	}
-	// 	else
-	// 	{
-	// 		for (int y = 0; y < curr_path.cells.size(); y++)
-	// 			curr_path.cells[y].strength = 1;
-	// 	}
+					if (left_stream <= 0 && right_stream <= 0)
+					{
+						curr_path.cells[i].strength = ants_per_cell;
+					}
+					else if (left_stream > 0 && right_stream > 0)
+					{
+						
+					}
+				}
+			}
 
-	// 	for (int m = 0; m < curr_path.cells.size(); m++)
-	// 	{
-	// 		cerr << "BEACON " << curr_path.cells[m].self_index << " STR " << curr_path.cells[m].strength << endl; 
-	// 		BEACON(curr_path.cells[m].self_index, curr_path.cells[m].strength);
-	// 	}
-	// }
-
-	// if (full_path.empty())
-	// 	cout << "WAIT;";
+			for (int m = 0; m < curr_path.cells.size(); m++)
+			{
+				cerr << "BEACON " << curr_path.cells[m].self_index << " STR " << curr_path.cells[m].strength << endl; 
+				BEACON(curr_path.cells[m].self_index, curr_path.cells[m].strength);
+			}
+		}
+	}
 
 }
 
