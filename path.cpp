@@ -787,72 +787,160 @@ void	go_little_ants()
 		return;
 	}
 
-	ValuePath	beacon_path(full_path, 0);
-	sort_cells_by_distance(beacon_path.cells);
+	// // GO GO GO GO
+	// for (int i = 0; i < full_path.size(); i++)
+	// {
+	// 	int strength = 1;
+	// 	BEACON(full_path[i], strength);
+	// }
 
-	int min = (*min_element(beacon_path.cells.begin(), beacon_path.cells.end(), 
+	if (cellList.egg_phase)
+	{
+		for (int i = 0; i < full_path.size(); i++)
+		{
+			int strength = 1;
+			BEACON(full_path[i], strength);
+		}
+	}
+	else
+	{
+		// EXPERIMENTAL
+		// for (int i = 0; i < all_paths.size(); i++)
+		// {
+		// 	cerr << "PATH " << i << " : ";
+		// 	for (int j = 0; j < all_paths[i].indexes.size(); j++)
+		// 	{
+		// 		cerr << all_paths[i].indexes[j] << " "; 
+		// 	}
+		// 	cerr << endl;
+		// }
+
+		for (int i = 0; i < all_paths.size(); i++)
+		{
+			ValuePath curr_path = all_paths[i];
+			int curr_ants = 0;
+			int path_size = 0;
+			int total_path_ants = 0;
+			int	ants_per_cell = 0;
+
+			for (int j = 0; j < curr_path.cells.size(); j++)
+				curr_ants += curr_path.cells[j].ally_ants;
+
+			if (i == 0)
+				path_size = curr_path.cells.size();
+			else
+				path_size = curr_path.cells.size() - 1;
+
+			total_path_ants = (path_size * cellList.ally_ants) / full_path_size;
+
+			ants_per_cell = total_path_ants / path_size;
+
+			int	salt = 0;
+			if (curr_path.cells.back().oppo_ants >= curr_path.cells.back().ally_ants)
+				salt = 1;
+			else if (curr_path.cells.back().current_resource < ants_per_cell)
+				salt = ants_per_cell - curr_path.cells.back().current_resource;
+			
+			
+			// cerr << "CURRENT ANTS " << curr_ants << " TOTAL PATH ANTS " << total_path_ants << endl;
+			// cerr << "ANTS PER CELL " << ants_per_cell << endl;
+
+			if (curr_ants == 0)
+			{
+				curr_path.cells.back().strength = total_path_ants;
+			}
+			// else if (curr_ants < total_path_ants)
+			// else
+			// {
+			// 	int ants_left = total_path_ants;
+			// 	curr_path.cells.front().strength = ants_per_cell;
+			// 	for (int j = curr_path.cells.size() - 1; j > 0; j--)
+			// 	{
+			// 		if (curr_path.cells[j].ally_ants)
+			// 		{
+			// 			curr_path.cells[j].strength = curr_ants / path_size;
+			// 			ants_left -= curr_ants / path_size;
+			// 		}
+			// 		else
+			// 		{
+						
+			// 			break;
+			// 		}
+			// 	}
+			// 	for (int j = 1; j < curr_path.cells.size(); j++)
+			// 	{
+			// 		if (curr_path.cells[j].ally_ants)
+			// 		{
+			// 			curr_path.cells[j].strength = curr_ants / path_size;
+			// 			ants_left -= curr_ants / path_size;
+			// 		}
+			// 		else
+			// 		{
+			// 			curr_path.cells[j].strength = ants_left;
+			// 			break;
+			// 		}
+			// 	}
+			// }
+			else
+			{
+				int min = (*min_element(curr_path.cells.begin(), curr_path.cells.end(), 
 							[](Cell a, Cell b) {return(a.ally_ants < b.ally_ants);})).ally_ants;
-	vector<int> min_ants;
-	int total_path_ants = cellList.ally_ants;
-	int ants_per_cell = total_path_ants / beacon_path.cells.size();
-	int max_str = cellList.ally_ants;
-	cerr << " APC " << ants_per_cell << " TOTAL " << total_path_ants << endl;
+				vector<int> min_ants;
+				int max_str = total_path_ants;
+				for (int j = 0; j < curr_path.cells.size(); j++)
+				{
+					if (curr_path.cells[j].ally_ants <= min)
+					{
+						min_ants.push_back(curr_path.cells[j].self_index);
+						continue;
+					}
+					int self_ants = curr_path.cells[j].ally_ants;
+					int right_theorical = ants_per_cell * curr_path.cells.size() - 1 - j;
+					int left_theorical = j;
+					int right_ants = 0;
+					for (int k = j + 1; k < curr_path.cells.size(); k++)
+						right_ants += curr_path.cells[k].ally_ants;
+					int left_ants = total_path_ants - right_ants - self_ants;
+					
+					// x < 0 = NEED ANTS ON LEFT, x > 0 = TOO MUCH ANTS ON LEFT
+					int left_stream = left_ants - left_theorical;
+					
+					// x < 0 = NEED ANTS ON RIGHT, x > 0 = TOO MUCH ANTS ON RIGHT
+					int right_stream = right_ants - right_theorical;
 
-	for (int j = 0; j < beacon_path.cells.size(); j++)
-	{
-		if (beacon_path.cells[j].ally_ants <= min)
-		{
-			min_ants.push_back(beacon_path.cells[j].self_index);
-			continue;
+					cerr << "LSTREAM " << left_stream << " RSTREAM " << right_stream << " SANT" << self_ants << endl; 
+					if (left_stream <= 0 && right_stream <= 0)
+					{
+						curr_path.cells[j].strength = ants_per_cell;
+					}
+					else if (left_stream > 0 && right_stream <= 0)
+					{
+						curr_path.cells[j].strength = self_ants - (self_ants + left_stream -  ants_per_cell);
+					}
+					else if (right_stream > 0 && left_stream <= 0)
+					{
+						curr_path.cells[j].strength = self_ants - (self_ants + right_stream - ants_per_cell);
+					}
+
+					if (curr_path.cells[j].strength < 0)
+						curr_path.cells[j].strength = 0;
+
+					max_str -= curr_path.cells[j].strength;
+
+					curr_path.cells[j].strength = 1;
+				}
+				for (int j = 0; j < curr_path.cells.size(); j++)
+				{
+					// cerr << "CELL " << curr_path.cells[j].self_index << " STR " << curr_path.cells[j].strength << endl;
+					// cerr << "MIN " << min << " MIN ANTS SIZE " << min_ants.size() << endl;
+					if (curr_path.cells[j].ally_ants <= min)
+					{
+						curr_path.cells[j].strength = max_str / min_ants.size();
+					}
+				}
+			}
 		}
-		int self_ants = beacon_path.cells[j].ally_ants;
-		int right_theorical = ants_per_cell * beacon_path.cells.size() - 1 - j;
-		int left_theorical = j;
-		int right_ants = 0;
-		for (int k = j + 1; k < beacon_path.cells.size(); k++)
-			right_ants += beacon_path.cells[k].ally_ants;
-		int left_ants = total_path_ants - right_ants - self_ants;
-		
-		// x < 0 = NEED ANTS ON LEFT, x > 0 = TOO MUCH ANTS ON LEFT
-		int left_stream = left_ants - left_theorical;
-		
-		// x < 0 = NEED ANTS ON RIGHT, x > 0 = TOO MUCH ANTS ON RIGHT
-		int right_stream = right_ants - right_theorical;
-
-		cerr << " CELL " << beacon_path.cells[j].self_index << " LSTREAM " << left_stream << " RSTREAM " << right_stream << " SANT" << self_ants << endl; 
-		if (left_stream <= 0 && right_stream <= 0)
-		{
-			beacon_path.cells[j].strength = ants_per_cell;
-		}
-		else if (left_stream > 0 && right_stream <= 0)
-		{
-			beacon_path.cells[j].strength = self_ants - (self_ants + left_stream -  ants_per_cell);
-		}
-		else if (right_stream > 0 && left_stream <= 0)
-		{
-			beacon_path.cells[j].strength = self_ants - (self_ants + right_stream - ants_per_cell);
-		}
-
-		if (beacon_path.cells[j].strength < 0)
-			beacon_path.cells[j].strength = 0;
-
-		max_str -= beacon_path.cells[j].strength;
-
-		beacon_path.cells[j].strength = 1;
 	}
-	for (int j = 0; j < beacon_path.cells.size(); j++)
-	{
-		if (beacon_path.cells[j].ally_ants <= min)
-		{
-			beacon_path.cells[j].strength = max_str / min_ants.size();
-		}
-	}
-	for (int m = 0; m < beacon_path.cells.size(); m++)
-	{
-		cerr << "BEACON " << beacon_path.cells[m].self_index << " STR " << beacon_path.cells[m].strength << endl; 
-		BEACON(beacon_path.cells[m].self_index, beacon_path.cells[m].strength);
-	}
-
 }
 
 ///////// STRATEGY FUNCTION /////////
